@@ -411,22 +411,24 @@ function setCaption(side, label, extra, href){
 
 /* ---------- Showing a pair ---------- */
 
-function render(side, cand, im){
+// The whole picture is always visible. It fills its half edge to edge only when that trims
+// almost nothing; otherwise it sits complete on a blurred copy of itself.
+function fit(side){
+  const im = side.art.querySelector("img.fg");
+  if (!im || !im.naturalHeight) return;
   const pr = side.pane.getBoundingClientRect();
   const ratio = (im.naturalWidth / im.naturalHeight) / (pr.width / Math.max(1, pr.height));
-  // A picture far wider or taller than its half is shown whole over a blurred copy, not cropped to a sliver.
-  const contain = ratio > 1.8 || ratio < 0.55;
-  const kids = [];
-  if (contain){
-    const bg = new Image();
-    bg.className = "bg"; bg.alt = ""; bg.src = cand.src;
-    kids.push(bg);
-  }
+  side.art.classList.toggle("contain", ratio > 1.06 || ratio < 0.94);
+}
+
+function render(side, cand, im){
+  const bg = new Image();
+  bg.className = "bg"; bg.alt = ""; bg.src = cand.src;
   im.className = "fg";
   im.alt = side.thing;
-  kids.push(im);
-  side.art.className = "art" + (contain ? " contain" : "");
-  side.art.replaceChildren(...kids);
+  side.art.className = "art";
+  side.art.replaceChildren(bg, im);
+  fit(side);
   side.word.hidden = true;
   const more = side.cands.length > 1 || side.sources.length > 0;
   setCaption(side, side.thing, more ? (side.idx + 1) + (side.sources.length ? "" : "/" + side.cands.length) : "", cand.page);
@@ -503,6 +505,8 @@ function go(things){
     advance(s, true);
   });
 }
+
+window.addEventListener("resize", () => sides.forEach(fit));   // rotating the phone changes what fits
 
 sides.forEach(s => s.pane.addEventListener("click", e => {
   if (e.target.closest(".cap")) return;              // the caption opens the picture's source page
