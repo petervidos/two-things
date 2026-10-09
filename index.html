@@ -1,0 +1,726 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#10202B">
+<meta name="referrer" content="no-referrer">
+<title>Two Things</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='29' fill='%23FFC533' stroke='%2310202B' stroke-width='5'/%3E%3Cpath d='M32 9v46' stroke='%2310202B' stroke-width='5'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600&family=Fredoka:wght@500;600&display=swap">
+<style>
+/* Layout: two full-bleed picture panes split by a seam; every control floats on the seam. */
+:root{
+  --ground:#E9EEF2; --pane-a:#DCE6EC; --pane-b:#E8E3D6;
+  --ink:#10202B; --muted:#52636F; --card:#F8FBFC; --line:#C5D1D9;
+  --signal:#FFC533; --signal-ink:#10202B;
+  --pill-bg:rgba(16,32,43,.82); --pill-fg:#F8FBFC;
+  --scrim:rgba(16,32,43,.45); --alert:#B3301C; --focus:#1E6BFF;
+  --font-display:"Fredoka","Arial Rounded MT Bold","Trebuchet MS",system-ui,sans-serif;
+  --font-body:"Figtree",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ground:#0A141A; --pane-a:#132430; --pane-b:#221F18;
+    --ink:#EAF1F5; --muted:#9DB0BC; --card:#16262F; --line:#2C404C;
+    --pill-bg:rgba(8,16,21,.84); --pill-fg:#EAF1F5;
+    --scrim:rgba(0,0,0,.55); --alert:#FF8A73; --focus:#8AB4FF;
+    color-scheme:dark;
+  }
+}
+
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{
+  margin:0; overflow:hidden; overscroll-behavior:none;
+  background:var(--ground); color:var(--ink);
+  font-family:var(--font-body); font-weight:500; font-size:14px;
+  -webkit-tap-highlight-color:transparent; touch-action:manipulation;
+  -webkit-user-select:none; user-select:none;
+}
+button{font:inherit; cursor:pointer}
+:focus-visible{outline:3px solid var(--focus); outline-offset:2px}
+
+.stage{
+  position:relative; height:100vh; height:100dvh; display:grid; gap:3px;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+}
+.pane{position:relative; overflow:hidden; min-width:0; min-height:0; cursor:pointer}
+.pane-a{background:var(--pane-a)}
+.pane-b{background:var(--pane-b)}
+.art{position:absolute; inset:0}
+.art svg{display:block; width:100%; height:100%}
+.art img{position:absolute; inset:0; width:100%; height:100%; animation:appear .25s ease-out}
+.art .fg{object-fit:cover}
+.art.contain .fg{object-fit:contain}
+.art .bg{object-fit:cover; filter:blur(22px) saturate(1.1); transform:scale(1.18)}
+@keyframes appear{from{opacity:0}}
+
+.word{
+  position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:.5em;
+  padding:16px 24px; text-align:center;
+}
+.word-text{
+  font-family:var(--font-display); font-weight:600; line-height:1;
+  font-size:clamp(28px,11vmin,104px); text-wrap:balance; overflow-wrap:anywhere;
+}
+.word-note{font-size:clamp(13px,3vmin,16px); color:var(--muted); max-width:32ch}
+.word.waiting .word-text{animation:breathe 1.4s ease-in-out infinite}
+.word.failed .word-note{color:var(--alert)}
+@keyframes breathe{50%{opacity:.35}}
+
+.cap{
+  position:absolute; top:12px; max-width:calc(100% - 130px);
+  padding:.25em .8em; border-radius:14px;
+  background:var(--pill-bg); color:var(--pill-fg); text-decoration:none;
+  font-family:var(--font-display); font-weight:500; line-height:1.3;
+  font-size:clamp(14px,3.6vmin,20px); overflow-wrap:anywhere;
+  transition:opacity .5s;
+}
+.cap small{font-family:var(--font-body); font-size:.68em; opacity:.75; margin-left:.5em; font-variant-numeric:tabular-nums}
+.pane-a .cap{left:max(12px, env(safe-area-inset-left, 0px))}
+.pane-b .cap{right:max(12px, env(safe-area-inset-right, 0px))}
+
+.tools{
+  position:absolute; top:max(10px, env(safe-area-inset-top, 0px)); left:50%; transform:translateX(-50%);
+  display:flex; gap:6px; align-items:center; transition:opacity .4s;
+}
+.seg{display:flex; padding:3px; border-radius:999px; background:var(--pill-bg)}
+.seg button{
+  border:0; border-radius:999px; padding:7px 12px; background:none;
+  color:var(--pill-fg); opacity:.72; font-size:12px; font-weight:600; letter-spacing:.04em;
+}
+.seg button[aria-pressed="true"]{background:var(--signal); color:var(--signal-ink); opacity:1}
+.icon-btn{
+  width:38px; height:38px; border:0; border-radius:50%;
+  display:grid; place-items:center; background:var(--pill-bg); color:var(--pill-fg);
+}
+
+.go{
+  position:absolute; left:50%; bottom:max(16px, env(safe-area-inset-bottom, 0px)); transform:translateX(-50%);
+  width:68px; height:68px; border-radius:50%;
+  display:grid; place-items:center;
+  background:var(--signal); color:var(--signal-ink);
+  border:3px solid var(--signal-ink); box-shadow:0 4px 0 var(--signal-ink);
+  transition:opacity .4s;
+}
+.go:active{margin-bottom:-3px; box-shadow:0 1px 0 var(--signal-ink)}
+.go::after{
+  content:""; position:absolute; inset:-3px; border-radius:50%;
+  border:3px solid var(--signal); opacity:0; pointer-events:none;
+}
+.go.live::after{animation:ring 1.1s ease-out infinite}
+@keyframes ring{from{opacity:.9; transform:scale(1)} to{opacity:0; transform:scale(1.75)}}
+
+.note, .listen{
+  position:absolute; left:50%; transform:translateX(-50%);
+  margin:0; max-width:calc(100% - 32px); text-align:center;
+  background:var(--pill-bg); color:var(--pill-fg); pointer-events:none;
+}
+.note{bottom:100px; padding:.5em 1em; border-radius:16px; line-height:1.35}
+.listen{
+  top:36%; transform:translate(-50%,-50%);
+  display:flex; align-items:center; gap:.55em;
+  padding:.4em .9em; border-radius:22px;
+  font-family:var(--font-display); font-weight:600; line-height:1.15;
+  font-size:clamp(20px,6.5vmin,40px); overflow-wrap:anywhere;
+}
+.bars{display:none; gap:4px; align-items:center; height:.9em; flex:none}
+.listen.live .bars{display:flex}
+.bars i{width:5px; height:100%; border-radius:3px; background:var(--signal); animation:bar .9s ease-in-out infinite}
+.bars i:nth-child(2){animation-delay:.15s}
+.bars i:nth-child(3){animation-delay:.3s}
+@keyframes bar{0%,100%{transform:scaleY(.3)} 50%{transform:scaleY(1)}}
+
+.scrim{position:absolute; inset:0; background:var(--scrim)}
+.sheet{
+  position:absolute; top:max(12px, env(safe-area-inset-top, 0px)); left:50%; transform:translateX(-50%);
+  width:min(560px, calc(100% - 32px)); display:grid; gap:8px; padding:12px 14px;
+  background:var(--card); color:var(--ink);
+  border:2px solid var(--ink); border-radius:18px; box-shadow:0 4px 0 var(--ink);
+}
+.sheet label{font-family:var(--font-display); font-weight:600; font-size:15px}
+.row{display:flex; gap:8px}
+.row input{
+  flex:1; min-width:0; padding:10px 12px; border-radius:12px;
+  border:2px solid var(--line); background:var(--ground); color:var(--ink);
+  font:500 18px/1.2 var(--font-body); -webkit-user-select:text; user-select:text;
+}
+.row button{
+  padding:0 18px; border-radius:12px; border:2px solid var(--signal-ink);
+  background:var(--signal); color:var(--signal-ink);
+  font-family:var(--font-display); font-weight:600; font-size:17px;
+}
+.sheet-note{margin:0; font-size:13px; line-height:1.35; color:var(--muted)}
+.sheet-note.warn{color:var(--alert)}
+
+/* Once a pair is on screen, the chrome steps back; a tap on a picture brings it forward. */
+.stage.quiet .cap, .stage.quiet .tools{opacity:0; pointer-events:none}
+.stage.quiet .go{opacity:.5}
+
+@media (orientation:portrait){
+  .stage{grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr) minmax(0,1fr)}
+  .pane-b .cap{left:12px; right:auto}
+  .tools{left:auto; right:12px; transform:none}
+  .go{bottom:auto; top:50%; transform:translate(-50%,-50%)}
+  .go:active{margin-bottom:0; margin-top:3px}
+  .note{bottom:auto; top:calc(50% + 52px)}
+  .listen{top:25%}
+}
+@media (prefers-reduced-motion: reduce){
+  .word.waiting .word-text, .go.live::after, .bars i, .art img{animation:none}
+  .go.live::after{opacity:.9; transform:scale(1.25)}
+  .cap, .tools, .go{transition:none}
+}
+</style>
+</head>
+<body>
+<main class="stage" id="stage">
+  <section class="pane pane-a" id="paneA">
+    <div class="art" id="artA"></div>
+    <div class="word" id="wordA" hidden><span class="word-text"></span><span class="word-note"></span></div>
+    <a class="cap" id="capA" target="_blank" rel="noopener" hidden></a>
+  </section>
+  <section class="pane pane-b" id="paneB">
+    <div class="art" id="artB"></div>
+    <div class="word" id="wordB" hidden><span class="word-text"></span><span class="word-note"></span></div>
+    <a class="cap" id="capB" target="_blank" rel="noopener" hidden></a>
+  </section>
+
+  <div class="tools" id="tools">
+    <div class="seg" role="group" aria-label="Nyelv / Language">
+      <button type="button" id="langHu" aria-pressed="true" aria-label="Magyar">HU</button>
+      <button type="button" id="langEn" aria-pressed="false" aria-label="English">EN</button>
+    </div>
+    <button type="button" class="icon-btn" id="typeBtn" aria-label="Beírás / Type">
+      <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2.5"/><path d="M7 10h.01M11 10h.01M15 10h.01M8 14h8"/></svg>
+    </button>
+    <button type="button" class="icon-btn" id="fsBtn" aria-label="Teljes képernyő / Full screen" hidden>
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+    </button>
+  </div>
+
+  <div class="listen" id="listen" hidden><span class="bars" aria-hidden="true"><i></i><i></i><i></i></span><span id="heard" aria-live="polite"></span></div>
+  <p class="note" id="note" role="status"></p>
+
+  <button type="button" class="go" id="goBtn" aria-label="Új képpár / New pair">
+    <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
+  </button>
+
+  <div class="scrim" id="scrim" hidden></div>
+  <form class="sheet" id="sheet" hidden novalidate>
+    <label for="things" id="sheetLabel"></label>
+    <div class="row">
+      <input id="things" name="things" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" maxlength="140">
+      <button type="submit" id="sheetGo"></button>
+    </div>
+    <p class="sheet-note" id="sheetNote"></p>
+  </form>
+</main>
+
+<script>
+(() => {
+"use strict";
+
+const $ = id => document.getElementById(id);
+const stage = $("stage"), goBtn = $("goBtn"), note = $("note");
+const listenEl = $("listen"), heardEl = $("heard");
+const scrim = $("scrim"), sheet = $("sheet"), input = $("things"), sheetNote = $("sheetNote");
+
+const store = {
+  get(k){ try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v){ try { localStorage.setItem(k, v); } catch {} },
+};
+
+/* ---------- Language ---------- */
+
+const TEXT = {
+  hu: {
+    hint: "Példák. Koppints, és mondj két dolgot.",
+    say: "Mondj két dolgot",
+    searching: "Keresem…",
+    none: "Ehhez nem találtam képet.",
+    offline: "Nem érem el a képkeresőt. Ellenőrizd az internetet, és koppints újra.",
+    second: "Koppints újra, és mondd a másodikat.",
+    nothing: "Nem hallottam semmit. Koppints, és próbáld újra.",
+    nomic: "A mikrofon nem indult el. Koppints újra, vagy használd a billentyűzet gombot.",
+    blocked: "A mikrofon itt le van tiltva. Engedélyezd a böngészőben, vagy írd be a két dolgot.",
+    label: "Két dolog",
+    placeholder: "bálna és villa",
+    submit: "Mehet",
+    sheetNote: "Írd be, vagy diktáld a billentyűzet mikrofonjával.",
+    two: "Két dolgot kérek, például: bálna és villa.",
+    another: "Nem jó a kép? Koppints rá, és jön a következő.",
+    example: "példa",
+    examples: ["bálna", "villa"],
+    speech: "hu-HU",
+  },
+  en: {
+    hint: "Examples. Tap and say two things.",
+    say: "Say two things",
+    searching: "Searching…",
+    none: "No picture found for this.",
+    offline: "Can't reach the picture search. Check the connection and tap again.",
+    second: "Tap again and say the second thing.",
+    nothing: "I didn't hear anything. Tap and try again.",
+    nomic: "The microphone didn't start. Tap to try again, or use the keyboard button.",
+    blocked: "The microphone is blocked here. Allow it in the browser, or type the two things.",
+    label: "Two things",
+    placeholder: "whale and fork",
+    submit: "Go",
+    sheetNote: "Type them, or dictate with the microphone on your keyboard.",
+    two: "Two things, please. For example: whale and fork.",
+    another: "Wrong picture? Tap it for the next one.",
+    example: "example",
+    examples: ["whale", "fork"],
+    speech: "en-US",
+  },
+};
+let lang = store.get("twothings.lang") === "en" ? "en" : "hu";
+const t = () => TEXT[lang];
+
+/* ---------- Splitting what was said into two things ---------- */
+
+const JOINERS = /\s+(?:and|or|vs\.?|versus|plus|then|és|meg|vagy|valamint|illetve)(?=\s|,|$)/gi;
+const ARTICLE = /^(?:a|an|the|egy|az)\s+/i;
+const INNER_ARTICLE = /\s+(?:a|an|the|egy|az)\s+/i;
+
+function parse(raw){
+  const s = String(raw || "").toLowerCase()
+    .replace(/[.!?…]+/g, " ").replace(/[;\/&+|]/g, ",")
+    .replace(JOINERS, ",").replace(/\s+/g, " ").trim();
+  let parts = s.split(",").map(p => p.trim().replace(ARTICLE, "").trim()).filter(Boolean);
+  if (parts.length === 1){
+    const byArticle = parts[0].split(INNER_ARTICLE).map(x => x.trim()).filter(Boolean);
+    if (byArticle.length >= 2) parts = byArticle;
+    else {
+      const w = parts[0].split(" ");
+      if (w.length < 2) return null;
+      const mid = Math.ceil(w.length / 2);
+      parts = [w.slice(0, mid).join(" "), w.slice(mid).join(" ")];
+    }
+  }
+  if (parts.length < 2) return null;
+  return [parts[0].slice(0, 60), parts[1].slice(0, 60)];
+}
+
+/* ---------- Picture search: Wikipedia in the chosen language, then English, then Wikimedia Commons ---------- */
+
+const THUMB = 960;   // one of Wikimedia's standard thumbnail widths
+const bare = s => s.toLowerCase().replace(/\s*\(.*\)\s*$/, "").trim();
+
+async function getJson(host, params, signal){
+  const u = new URL("https://" + host + "/w/api.php");
+  u.search = new URLSearchParams({ ...params, format: "json", formatversion: "2", origin: "*" }).toString();
+  const r = await fetch(u, { signal });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  return r.json();
+}
+
+// The lead picture of the best-matching articles.
+async function wikipedia(wikiLang, q, signal){
+  const host = wikiLang + ".wikipedia.org";
+  const j = await getJson(host, {
+    action: "query", generator: "search", gsrsearch: q, gsrlimit: "8", gsrnamespace: "0",
+    prop: "pageimages|pageprops", piprop: "thumbnail", pithumbsize: String(THUMB), pilimit: "8", pilicense: "any",
+    ppprop: "disambiguation", redirects: "1",
+  }, signal);
+  const pages = ((j.query && j.query.pages) || [])
+    .filter(p => p.thumbnail && p.thumbnail.width >= 220 && !(p.pageprops && "disambiguation" in p.pageprops));
+  const want = bare(q);
+  pages.sort((a, b) => (bare(b.title) === want) - (bare(a.title) === want) || (a.index || 0) - (b.index || 0));
+  return pages.map(p => ({ src: p.thumbnail.source, page: "https://" + host + "/?curid=" + p.pageid, from: "Wikipedia" }));
+}
+
+// Photos from the Commons media library, for when no article fits or more choices are wanted.
+async function commons(q, signal){
+  const j = await getJson("commons.wikimedia.org", {
+    action: "query", generator: "search", gsrsearch: q + " filetype:bitmap", gsrlimit: "8", gsrnamespace: "6",
+    prop: "imageinfo", iiprop: "url", iiurlwidth: String(THUMB), uselang: lang,
+  }, signal);
+  const pages = ((j.query && j.query.pages) || []).filter(p => p.imageinfo && p.imageinfo[0] && p.imageinfo[0].thumburl);
+  pages.sort((a, b) => (a.index || 0) - (b.index || 0));
+  return pages.map(p => ({ src: p.imageinfo[0].thumburl, page: p.imageinfo[0].descriptionurl || "", from: "Commons" }));
+}
+
+function sourcesFor(q){
+  const wikis = lang === "hu" ? ["hu", "en"] : ["en"];
+  return [...wikis.map(w => signal => wikipedia(w, q, signal)), signal => commons(q, signal)];
+}
+
+function preload(src){
+  return new Promise(resolve => {
+    const im = new Image();
+    const timer = setTimeout(() => resolve(null), 9000);
+    im.onload = () => { clearTimeout(timer); resolve(im.naturalWidth > 1 ? im : null); };
+    im.onerror = () => { clearTimeout(timer); resolve(null); };
+    im.src = src;
+  });
+}
+
+/* ---------- Small view helpers ---------- */
+
+const sides = ["A", "B"].map(k => ({
+  pane: $("pane" + k), art: $("art" + k), word: $("word" + k), cap: $("cap" + k),
+  thing: "", cands: [], seen: new Set(), sources: [], idx: -1, ctl: null, job: null, reached: false,
+}));
+
+let noteT = 0, quietT = 0, round = 0;
+
+function say(text, ms){
+  clearTimeout(noteT);
+  note.textContent = text;
+  note.hidden = !text;
+  if (text && ms) noteT = setTimeout(() => { note.hidden = true; }, ms);
+}
+
+function busy(){ return sides.some(s => s.job) || listening || !sheet.hidden || !listenEl.hidden; }
+
+function wake(ms){
+  stage.classList.remove("quiet");
+  clearTimeout(quietT);
+  if (ms) quietT = setTimeout(() => { if (round > 0 && !busy()) stage.classList.add("quiet"); }, ms);
+}
+
+function showWord(side, text, sub, cls){
+  side.word.querySelector(".word-text").textContent = text;
+  side.word.querySelector(".word-note").textContent = sub || "";
+  side.word.className = "word" + (cls ? " " + cls : "");
+  side.word.hidden = false;
+}
+
+function showListen(text, live){
+  heardEl.textContent = text;
+  listenEl.classList.toggle("live", !!live);
+  listenEl.hidden = false;
+}
+
+function setCaption(side, label, extra, href){
+  side.cap.textContent = label;
+  if (extra){
+    const sm = document.createElement("small");
+    sm.textContent = extra;
+    side.cap.appendChild(sm);
+  }
+  if (href) side.cap.href = href; else side.cap.removeAttribute("href");
+  side.cap.hidden = false;
+}
+
+/* ---------- Showing a pair ---------- */
+
+function render(side, cand, im){
+  const pr = side.pane.getBoundingClientRect();
+  const ratio = (im.naturalWidth / im.naturalHeight) / (pr.width / Math.max(1, pr.height));
+  // A picture far wider or taller than its half is shown whole over a blurred copy, not cropped to a sliver.
+  const contain = ratio > 1.8 || ratio < 0.55;
+  const kids = [];
+  if (contain){
+    const bg = new Image();
+    bg.className = "bg"; bg.alt = ""; bg.src = cand.src;
+    kids.push(bg);
+  }
+  im.className = "fg";
+  im.alt = side.thing;
+  kids.push(im);
+  side.art.className = "art" + (contain ? " contain" : "");
+  side.art.replaceChildren(...kids);
+  side.word.hidden = true;
+  const more = side.cands.length > 1 || side.sources.length > 0;
+  setCaption(side, side.thing, more ? (side.idx + 1) + (side.sources.length ? "" : "/" + side.cands.length) : "", cand.page);
+}
+
+// Moves a side to its next picture, pulling in the next search source when the list runs out.
+async function advance(side, fresh){
+  if (side.job && !fresh) return;
+  const job = side.job = {};
+  const live = () => side.job === job;
+  try {
+    for (let tries = 0; tries < 5; tries++){
+      let next = side.idx + 1;
+      while (next >= side.cands.length && side.sources.length){
+        const source = side.sources.shift();
+        try {
+          const found = await source(side.ctl.signal);
+          if (!live()) return;
+          side.reached = true;
+          for (const c of found) if (!side.seen.has(c.src)){ side.seen.add(c.src); side.cands.push(c); }
+        } catch (e) {
+          if (!live()) return;
+        }
+      }
+      if (!side.cands.length) break;
+      if (next >= side.cands.length) next = 0;
+      if (next === side.idx) return;                 // the only picture is already showing
+      const cand = side.cands[next];
+      const im = await preload(cand.src);
+      if (!live()) return;
+      if (im){ side.idx = next; render(side, cand, im); return; }
+      side.cands.splice(next, 1);                    // broken picture: drop it and try the next
+      if (next <= side.idx) side.idx--;
+    }
+    if (side.idx < 0){
+      side.art.replaceChildren();
+      side.cap.hidden = true;
+      showWord(side, side.thing, side.reached ? t().none : t().offline, "failed");
+    }
+  } finally {
+    if (live()){
+      side.job = null;
+      if (sides.every(s => !s.job)) settled();
+    }
+  }
+}
+
+function settled(){
+  wake(3500);
+  if (store.get("twothings.tip") !== "1" && sides.some(s => s.idx >= 0 && s.cands.length > 1)){
+    store.set("twothings.tip", "1");
+    say(t().another, 4500);
+  }
+}
+
+function go(things){
+  ++round;
+  stopListening();
+  carry = "";
+  closeSheet();
+  say("");
+  wake(0);
+  keepAwake();
+  sides.forEach((s, i) => {
+    if (s.ctl) s.ctl.abort();
+    s.ctl = new AbortController();
+    s.thing = things[i];
+    s.cands = []; s.seen = new Set(); s.idx = -1; s.reached = false;
+    s.sources = sourcesFor(things[i]);
+    s.art.className = "art";
+    s.art.replaceChildren();
+    s.cap.hidden = true;
+    showWord(s, things[i], t().searching, "waiting");
+    advance(s, true);
+  });
+}
+
+sides.forEach(s => s.pane.addEventListener("click", e => {
+  if (e.target.closest(".cap")) return;              // the caption opens the picture's source page
+  wake(3500);
+  if (round > 0 && s.idx >= 0) advance(s, false);
+}));
+
+/* ---------- Typing (and keyboard dictation) ---------- */
+
+function openSheet(text, msg){
+  const wasHidden = sheet.hidden;
+  if (wasHidden || text) input.value = text || "";
+  sheetNote.textContent = msg || t().sheetNote;
+  sheetNote.classList.toggle("warn", !!msg);
+  scrim.hidden = false;
+  sheet.hidden = false;
+  say("");
+  wake(0);
+  if (wasHidden) input.focus();
+}
+
+function closeSheet(){
+  if (sheet.hidden) return;
+  input.blur();
+  scrim.hidden = true;
+  sheet.hidden = true;
+}
+
+sheet.addEventListener("submit", e => {
+  e.preventDefault();
+  const p = parse(input.value);
+  if (p) { go(p); return; }
+  sheetNote.textContent = t().two;
+  sheetNote.classList.add("warn");
+  input.focus();
+});
+
+scrim.addEventListener("click", () => { closeSheet(); stopListening(); wake(3500); });
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && !sheet.hidden){ closeSheet(); stopListening(); wake(3500); }
+});
+
+$("typeBtn").addEventListener("click", () => {
+  const seed = carry;
+  stopListening();
+  carry = "";
+  openSheet(seed);
+});
+
+/* ---------- One-tap voice ---------- */
+
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+// "try": use the microphone. "no": this browser has none or refused it; type instead.
+let voice = SR ? "try" : "no";
+let rec = null, listening = false, heard = "", carry = "", silenceT = 0, hardT = 0;
+
+const flat = s => s.toLowerCase().replace(/[,\s]+/g, " ").trim();
+
+function stopListening(){
+  const r = rec;
+  rec = null;
+  listening = false;
+  clearTimeout(silenceT);
+  clearTimeout(hardT);
+  listenEl.hidden = true;
+  goBtn.classList.remove("live");
+  if (r) { try { r.abort(); } catch {} }
+}
+
+function finishListening(){
+  const p = parse(heard);
+  if (p) { go(p); return; }
+  if (rec) { try { rec.stop(); } catch { stopListening(); } }
+}
+
+function startListening(){
+  let mine;
+  try {
+    mine = new SR();
+    mine.lang = t().speech;
+    mine.continuous = true;
+    mine.interimResults = true;
+    mine.maxAlternatives = 1;
+  } catch {
+    voice = "no";
+    openSheet("");
+    return;
+  }
+  rec = mine;
+  heard = carry;
+
+  const confirmVoice = () => {
+    if (mine !== rec || listening) return;
+    listening = true;
+    closeSheet();
+    say("");
+    wake(0);
+    goBtn.classList.add("live");
+    showListen(carry ? carry + "  +  …" : t().say, true);
+    clearTimeout(hardT);
+    hardT = setTimeout(() => { if (mine === rec) finishListening(); }, 12000);
+  };
+
+  mine.onstart = confirmVoice;
+  mine.onaudiostart = confirmVoice;
+
+  mine.onresult = ev => {
+    if (mine !== rec) return;
+    confirmVoice();
+    // Finished phrases are separate things; unfinished ones are one phrase still forming.
+    let acc = "", tail = "";
+    for (let i = 0; i < ev.results.length; i++){
+      const x = ev.results[i][0].transcript.trim();
+      if (!x) continue;
+      if (!ev.results[i].isFinal){ tail = tail ? tail + " " + x : x; continue; }
+      if (acc && flat(x).startsWith(flat(acc))) acc = x;   // some phones repeat the whole phrase so far
+      else acc = acc ? acc + ", " + x : x;
+    }
+    if (tail) acc = acc ? acc + ", " + tail : tail;
+    heard = carry ? (acc ? carry + ", " + acc : carry) : acc;
+    const p = parse(heard);
+    showListen(p ? p[0] + "  +  " + p[1] : heard ? heard + "  +  …" : t().say, true);
+    clearTimeout(silenceT);
+    silenceT = setTimeout(() => { if (mine === rec && parse(heard)) finishListening(); }, 1300);
+  };
+
+  mine.onerror = ev => {
+    if (mine !== rec) return;
+    if (ev.error === "not-allowed" || ev.error === "service-not-allowed" || ev.error === "audio-capture") voice = "no";
+  };
+
+  mine.onend = () => {
+    if (mine !== rec) return;
+    const was = listening;
+    stopListening();
+    const p = parse(heard);
+    if (p) { go(p); return; }
+    if (voice === "no") { openSheet(heard, t().blocked); return; }
+    if (!was) { say(t().nomic, 6000); return; }
+    if (heard){
+      carry = heard;
+      showListen(heard + "  +  …", false);
+      say(t().second, 6000);
+    } else {
+      say(t().nothing, 5000);
+    }
+  };
+
+  try { mine.start(); }
+  catch {
+    rec = null;
+    voice = "no";
+    openSheet("");
+  }
+}
+
+goBtn.addEventListener("click", () => {
+  if (listening) { finishListening(); return; }
+  say("");
+  wake(0);
+  if (voice === "no") { const seed = carry; carry = ""; listenEl.hidden = true; openSheet(seed); return; }
+  startListening();
+});
+
+/* ---------- Extras: language switch, full screen, screen stays on ---------- */
+
+const EXAMPLE_ART = [
+  '<svg viewBox="0 0 440 400" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C9EEF4"/><stop offset="1" stop-color="#63BBD8"/></linearGradient></defs><rect width="440" height="400" fill="url(#sea)"/><path d="M252 124 C252 92 234 80 214 86 M252 124 C252 90 272 78 292 86" fill="none" stroke="#FFFFFF" stroke-width="9" stroke-linecap="round"/><path d="M100 214 C72 194 52 162 60 130 C78 150 98 156 112 150 C108 128 118 110 136 100 C142 132 140 172 128 216 Z" fill="#1F4E79"/><path d="M96 214 C120 150 210 122 290 132 C350 140 388 182 388 228 C388 282 330 314 250 314 C170 314 116 282 96 214 Z" fill="#2A6FA8"/><path d="M146 274 C200 302 300 306 374 262 C354 300 304 314 250 314 C206 314 170 300 146 274 Z" fill="#DCEFF7"/><path d="M232 262 C228 298 248 324 280 332 C276 306 282 284 298 266 Z" fill="#1F4E79"/><circle cx="336" cy="208" r="9" fill="#10202B"/><circle cx="339" cy="205" r="3" fill="#FFFFFF"/><path d="M314 250 C338 260 362 254 378 238" fill="none" stroke="#10202B" stroke-width="5" stroke-linecap="round"/><path d="M0 352 C40 334 70 370 110 352 C150 334 180 370 220 352 C260 334 290 370 330 352 C370 334 400 370 440 352 L440 400 L0 400 Z" fill="#3E9CC4"/></svg>',
+  '<svg viewBox="0 0 440 400" preserveAspectRatio="xMidYMid slice"><rect width="440" height="400" fill="#F6C7B3"/><ellipse cx="236" cy="352" rx="110" ry="13" fill="#E7A68E"/><g transform="rotate(16 220 200)"><path d="M207 188 L233 188 L231 338 C231 356 209 356 209 338 Z" fill="#AEBAC5"/><path d="M174 116 L266 116 C266 168 252 192 234 198 L206 198 C188 192 174 168 174 116 Z" fill="#D3DBE2"/><rect x="174" y="36" width="17" height="92" rx="8.5" fill="#D3DBE2"/><rect x="199" y="36" width="17" height="92" rx="8.5" fill="#D3DBE2"/><rect x="224" y="36" width="17" height="92" rx="8.5" fill="#D3DBE2"/><rect x="249" y="36" width="17" height="92" rx="8.5" fill="#D3DBE2"/><path d="M215 206 L215 332" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" opacity="0.65"/><path d="M186 128 C186 158 196 178 210 186" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" opacity="0.6"/></g></svg>',
+];
+
+const langBtns = { hu: $("langHu"), en: $("langEn") };
+function setLang(l){
+  lang = l;
+  store.set("twothings.lang", l);
+  document.documentElement.lang = l;
+  langBtns.hu.setAttribute("aria-pressed", String(l === "hu"));
+  langBtns.en.setAttribute("aria-pressed", String(l === "en"));
+  $("sheetLabel").textContent = t().label;
+  $("sheetGo").textContent = t().submit;
+  input.placeholder = t().placeholder;
+  if (!sheet.hidden) sheetNote.textContent = t().sheetNote;
+  if (round === 0){
+    // First view: a marked example pair, drawn in the page itself.
+    sides.forEach((s, i) => {
+      s.thing = t().examples[i];
+      s.art.innerHTML = EXAMPLE_ART[i];
+      setCaption(s, s.thing, t().example, "");
+    });
+    say(t().hint);
+  }
+}
+langBtns.hu.addEventListener("click", () => { stopListening(); setLang("hu"); wake(3500); });
+langBtns.en.addEventListener("click", () => { stopListening(); setLang("en"); wake(3500); });
+setLang(lang);
+
+const fsBtn = $("fsBtn");
+if (document.fullscreenEnabled && document.documentElement.requestFullscreen){
+  fsBtn.hidden = false;
+  fsBtn.addEventListener("click", () => {
+    const p = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+    if (p && p.catch) p.catch(() => {});
+  });
+}
+
+let lock = null;
+async function keepAwake(){
+  try {
+    if (lock || !navigator.wakeLock) return;
+    lock = await navigator.wakeLock.request("screen");
+    lock.addEventListener("release", () => { lock = null; });
+  } catch {}
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && round > 0) keepAwake();
+});
+
+})();
+</script>
+</body>
+</html>
