@@ -75,14 +75,32 @@ button{font:inherit; cursor:pointer}
 .cap{
   position:absolute; top:12px; max-width:calc(100% - 130px);
   padding:.25em .8em; border-radius:14px;
-  background:var(--pill-bg); color:var(--pill-fg); text-decoration:none;
+  background:var(--pill-bg); color:var(--pill-fg); border:0; cursor:pointer; text-align:left;
   font-family:var(--font-display); font-weight:500; line-height:1.3;
   font-size:clamp(14px,3.6vmin,20px); overflow-wrap:anywhere;
   transition:opacity .5s;
 }
 .cap small{font-family:var(--font-body); font-size:.68em; opacity:.75; margin-left:.5em; font-variant-numeric:tabular-nums}
-.pane-a .cap{left:max(12px, env(safe-area-inset-left, 0px))}
-.pane-b .cap{right:max(12px, env(safe-area-inset-right, 0px))}
+.cap::after{content:"\25BE"; margin-left:.45em; font-size:.75em; opacity:.75}
+.cap:disabled{cursor:default}
+.cap:disabled::after{content:none}
+.pane-a .cap, .pane-a .strip{left:max(12px, env(safe-area-inset-left, 0px))}
+.pane-b .cap, .pane-b .strip{right:max(12px, env(safe-area-inset-right, 0px))}
+
+/* Every picture found for a word; opened from its name. */
+.strip{
+  position:absolute; top:54px; max-width:calc(100% - 24px);
+  display:flex; gap:6px; align-items:center; padding:6px; border-radius:14px;
+  background:var(--pill-bg); overflow-x:auto; scrollbar-width:none; cursor:default;
+}
+.strip::-webkit-scrollbar{display:none}
+.thumb{
+  flex:none; width:76px; height:57px; padding:0; overflow:hidden;
+  border:3px solid transparent; border-radius:10px; background:var(--line);
+}
+.thumb img{display:block; width:100%; height:100%; object-fit:cover}
+.thumb[aria-current="true"]{border-color:var(--signal)}
+.strip .src{flex:none; padding:0 .7em; color:var(--pill-fg); font-size:12px; font-weight:600; white-space:nowrap}
 
 .tools{
   position:absolute; top:max(10px, env(safe-area-inset-top, 0px)); left:50%; transform:translateX(-50%);
@@ -163,7 +181,7 @@ button{font:inherit; cursor:pointer}
 
 @media (orientation:portrait){
   .stage{grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr) minmax(0,1fr)}
-  .pane-b .cap{left:12px; right:auto}
+  .pane-b .cap, .pane-b .strip{left:12px; right:auto}
   .tools{left:auto; right:12px; transform:none}
   .go{bottom:auto; top:50%; transform:translate(-50%,-50%)}
   .go:active{margin-bottom:0; margin-top:3px}
@@ -182,12 +200,14 @@ button{font:inherit; cursor:pointer}
   <section class="pane pane-a" id="paneA">
     <div class="art" id="artA"></div>
     <div class="word" id="wordA" hidden><span class="word-text"></span><span class="word-note"></span></div>
-    <a class="cap" id="capA" target="_blank" rel="noopener" hidden></a>
+    <button type="button" class="cap" id="capA" hidden></button>
+    <div class="strip" id="stripA" hidden></div>
   </section>
   <section class="pane pane-b" id="paneB">
     <div class="art" id="artB"></div>
     <div class="word" id="wordB" hidden><span class="word-text"></span><span class="word-note"></span></div>
-    <a class="cap" id="capB" target="_blank" rel="noopener" hidden></a>
+    <button type="button" class="cap" id="capB" hidden></button>
+    <div class="strip" id="stripB" hidden></div>
   </section>
 
   <div class="tools" id="tools">
@@ -253,7 +273,8 @@ const TEXT = {
     submit: "Mehet",
     sheetNote: "Írd be, vagy diktáld a billentyűzet mikrofonjával.",
     two: "Két dolgot kérek, például: bálna és villa.",
-    another: "Nem jó a kép? Koppints rá, és jön a következő.",
+    another: "Nem jó a kép? Koppints rá a következőért, vagy a nevére az összesért.",
+    source: "forrás",
     example: "példa",
     examples: ["bálna", "villa"],
     speech: "hu-HU",
@@ -273,7 +294,8 @@ const TEXT = {
     submit: "Go",
     sheetNote: "Type them, or dictate with the microphone on your keyboard.",
     two: "Two things, please. For example: whale and fork.",
-    another: "Wrong picture? Tap it for the next one.",
+    another: "Wrong picture? Tap it for the next one, or its name to see them all.",
+    source: "source",
     example: "example",
     examples: ["whale", "fork"],
     speech: "en-US",
@@ -364,7 +386,7 @@ function preload(src){
 /* ---------- Small view helpers ---------- */
 
 const sides = ["A", "B"].map(k => ({
-  pane: $("pane" + k), art: $("art" + k), word: $("word" + k), cap: $("cap" + k),
+  pane: $("pane" + k), art: $("art" + k), word: $("word" + k), cap: $("cap" + k), strip: $("strip" + k),
   thing: "", cands: [], seen: new Set(), sources: [], idx: -1, ctl: null, job: null, reached: false,
 }));
 
@@ -377,7 +399,7 @@ function say(text, ms){
   if (text && ms) noteT = setTimeout(() => { note.hidden = true; }, ms);
 }
 
-function busy(){ return sides.some(s => s.job) || listening || !sheet.hidden || !listenEl.hidden; }
+function busy(){ return sides.some(s => s.job || !s.strip.hidden) || listening || !sheet.hidden || !listenEl.hidden; }
 
 function wake(ms){
   stage.classList.remove("quiet");
@@ -398,14 +420,14 @@ function showListen(text, live){
   listenEl.hidden = false;
 }
 
-function setCaption(side, label, extra, href){
+function setCaption(side, label, extra){
   side.cap.textContent = label;
   if (extra){
     const sm = document.createElement("small");
     sm.textContent = extra;
     side.cap.appendChild(sm);
   }
-  if (href) side.cap.href = href; else side.cap.removeAttribute("href");
+  side.cap.disabled = !side.cands.length;
   side.cap.hidden = false;
 }
 
@@ -431,7 +453,96 @@ function render(side, cand, im){
   fit(side);
   side.word.hidden = true;
   const more = side.cands.length > 1 || side.sources.length > 0;
-  setCaption(side, side.thing, more ? (side.idx + 1) + (side.sources.length ? "" : "/" + side.cands.length) : "", cand.page);
+  setCaption(side, side.thing, more ? (side.idx + 1) + (side.sources.length ? "" : "/" + side.cands.length) : "");
+  markStrip(side);
+}
+
+/* ---------- All pictures for a word ---------- */
+
+// Wikimedia serves the same picture at a few fixed widths; the strip uses a small one.
+const small = src => src.replace(/\/\d+px-([^\/]+)$/, "/250px-$1");
+
+function addFound(side, found){
+  for (const c of found) if (!side.seen.has(c.src)){ side.seen.add(c.src); side.cands.push(c); }
+}
+
+function markStrip(side){
+  if (!side.strip.childElementCount) return;
+  const thumbs = side.strip.querySelectorAll(".thumb");
+  thumbs.forEach((b, i) => b.setAttribute("aria-current", String(i === side.idx)));
+  const link = side.strip.querySelector(".src"), cur = side.cands[side.idx];
+  if (link){
+    link.hidden = !(cur && cur.page);
+    if (cur && cur.page) link.href = cur.page;
+  }
+  if (!side.strip.hidden && thumbs[side.idx]) thumbs[side.idx].scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+
+function buildStrip(side){
+  const kids = side.cands.map((c, i) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "thumb";
+    const im = new Image();
+    im.alt = side.thing + " " + (i + 1);
+    im.onerror = () => { if (im.dataset.full) b.hidden = true; else { im.dataset.full = "1"; im.src = c.src; } };
+    im.src = small(c.src);
+    b.appendChild(im);
+    b.addEventListener("click", () => pick(side, c));
+    return b;
+  });
+  const link = document.createElement("a");
+  link.className = "src";
+  link.target = "_blank";
+  link.rel = "noopener";
+  link.textContent = t().source + " \u2197";
+  side.strip.replaceChildren(...kids, link);
+  markStrip(side);
+}
+
+function closeStrips(){ sides.forEach(s => { s.strip.hidden = true; }); }
+
+// Opens the strip for one word, first fetching every remaining search source so nothing is missing.
+async function openStrip(side){
+  if (side.job) return;
+  closeStrips();
+  wake(0);
+  const job = side.job = {};
+  try {
+    while (side.sources.length){
+      const source = side.sources.shift();
+      try {
+        const found = await source(side.ctl.signal);
+        if (side.job !== job) return;
+        addFound(side, found);
+      } catch (e) {
+        if (side.job !== job) return;
+      }
+    }
+  } finally {
+    if (side.job === job) side.job = null;
+  }
+  setCaption(side, side.thing, side.cands.length > 1 ? (side.idx + 1) + "/" + side.cands.length : "");
+  side.strip.hidden = false;
+  buildStrip(side);
+  say("");
+}
+
+async function pick(side, cand){
+  if (side.job) return;
+  const job = side.job = {};
+  try {
+    const im = await preload(cand.src);
+    if (side.job !== job) return;
+    const i = side.cands.indexOf(cand);
+    if (i < 0) return;
+    if (im){ side.idx = i; render(side, cand, im); return; }
+    side.cands.splice(i, 1);
+    if (i <= side.idx) side.idx--;
+    buildStrip(side);
+  } finally {
+    if (side.job === job) side.job = null;
+  }
 }
 
 // Moves a side to its next picture, pulling in the next search source when the list runs out.
@@ -448,7 +559,7 @@ async function advance(side, fresh){
           const found = await source(side.ctl.signal);
           if (!live()) return;
           side.reached = true;
-          for (const c of found) if (!side.seen.has(c.src)){ side.seen.add(c.src); side.cands.push(c); }
+          addFound(side, found);
         } catch (e) {
           if (!live()) return;
         }
@@ -462,6 +573,7 @@ async function advance(side, fresh){
       if (im){ side.idx = next; render(side, cand, im); return; }
       side.cands.splice(next, 1);                    // broken picture: drop it and try the next
       if (next <= side.idx) side.idx--;
+      if (side.strip.childElementCount) buildStrip(side);
     }
     if (side.idx < 0){
       side.art.replaceChildren();
@@ -501,6 +613,8 @@ function go(things){
     s.art.className = "art";
     s.art.replaceChildren();
     s.cap.hidden = true;
+    s.strip.hidden = true;
+    s.strip.replaceChildren();
     showWord(s, things[i], t().searching, "waiting");
     advance(s, true);
   });
@@ -508,11 +622,21 @@ function go(things){
 
 window.addEventListener("resize", () => sides.forEach(fit));   // rotating the phone changes what fits
 
-sides.forEach(s => s.pane.addEventListener("click", e => {
-  if (e.target.closest(".cap")) return;              // the caption opens the picture's source page
-  wake(3500);
-  if (round > 0 && s.idx >= 0) advance(s, false);
-}));
+sides.forEach(s => {
+  s.pane.addEventListener("click", e => {
+    if (e.target.closest(".cap, .strip")) return;
+    if (sides.some(x => !x.strip.hidden)){ closeStrips(); wake(3500); return; }
+    const wasQuiet = stage.classList.contains("quiet");
+    wake(3500);
+    if (wasQuiet) return;                            // first tap only brings the controls back
+    if (round > 0 && s.idx >= 0) advance(s, false);
+  });
+  s.cap.addEventListener("click", () => {
+    if (round === 0 || !s.cands.length) return;
+    if (!s.strip.hidden){ closeStrips(); wake(3500); return; }
+    openStrip(s);
+  });
+});
 
 /* ---------- Typing (and keyboard dictation) ---------- */
 
@@ -694,7 +818,7 @@ function setLang(l){
     sides.forEach((s, i) => {
       s.thing = t().examples[i];
       s.art.innerHTML = EXAMPLE_ART[i];
-      setCaption(s, s.thing, t().example, "");
+      setCaption(s, s.thing, t().example);
     });
     say(t().hint);
   }
